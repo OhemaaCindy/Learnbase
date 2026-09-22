@@ -1,9 +1,15 @@
 node_modules/
-.env
-.env.local
 dist/
 build/
 coverage/
 .turbo/
 *.log
 .DS_Store
+
+# API secrets: JWT, Cloudinary, Paystack, SMTP. Never commit.
+apps/api/.env
+apps/api/.env.local
+
+# The two frontend .env files are deliberately NOT ignored. They are
+# already tracked, hold only public VITE_* values that Vite compiles
+# into the client bundle, and change at the Phase 5 cutover.
