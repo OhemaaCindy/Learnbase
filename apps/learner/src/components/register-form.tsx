@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { InputField } from "./inputs";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "./../../node_modules/@hookform/resolvers/zod/src/zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { LockKeyhole, Mail, UserRound } from "lucide-react";
 import {
   registrationSchema,
