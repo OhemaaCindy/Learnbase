@@ -367,7 +367,7 @@ Replaces the duplicate `interface User` declarations that TypeScript was silentl
   },
   "files": ["dist"],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --typecheck"
   },
@@ -381,6 +381,9 @@ Replaces the duplicate `interface User` declarations that TypeScript was silentl
 
 - [ ] **Step 2: Create `packages/types/tsconfig.json`**
 
+This one includes the type tests, because `vitest --typecheck` derives its
+program from it. Excluding them here would make the tests silently never run.
+
 ```json
 {
   "extends": "@learnbase/tsconfig/base.json",
@@ -388,7 +391,17 @@ Replaces the duplicate `interface User` declarations that TypeScript was silentl
     "outDir": "./dist",
     "rootDir": "./src"
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts"]
+}
+```
+
+- [ ] **Step 2b: Create `packages/types/tsconfig.build.json`**
+
+The build excludes the type tests so they are never emitted into `dist`.
+
+```json
+{
+  "extends": "./tsconfig.json",
   "exclude": ["src/**/*.test-d.ts"]
 }
 ```
@@ -930,7 +943,7 @@ git commit -m "feat(types): add track, course and invoice contract types"
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
@@ -996,7 +1009,7 @@ The 30s timeout exists because `mongodb-memory-server` downloads a MongoDB binar
 
 ```
 NODE_ENV=development
-PORT=5000
+PORT=5050
 MONGODB_URI=mongodb://127.0.0.1:27017/learnbase
 CLIENT_ADMIN_URL=http://localhost:5173
 CLIENT_LEARNER_URL=http://localhost:5174
@@ -1101,7 +1114,7 @@ Expected: PASS — 2 tests.
 import "dotenv/config";
 import { createApp } from "./app.js";
 
-const port = Number(process.env.PORT ?? 5000);
+const port = Number(process.env.PORT ?? 5050);
 
 const app = createApp();
 
@@ -1117,7 +1130,7 @@ Mongo connection is wired into this file in Task 8.
 ```bash
 pnpm --filter @learnbase/api dev &
 sleep 3
-curl -s http://localhost:5000/api/health
+curl -s http://localhost:5050/api/health
 kill %1
 ```
 
@@ -1528,7 +1541,7 @@ import "dotenv/config";
 import { createApp } from "./app.js";
 import { connectDB } from "./shared/db.js";
 
-const port = Number(process.env.PORT ?? 5000);
+const port = Number(process.env.PORT ?? 5050);
 const mongoUri = process.env.MONGODB_URI;
 
 if (!mongoUri) {
@@ -1793,9 +1806,10 @@ git commit -m "refactor: re-export shared contract types in both frontends"
 - [ ] `pnpm run build`, `pnpm run test` and `pnpm run typecheck` all pass from the root.
 - [ ] `git log --oneline -- apps/admin` and `-- apps/learner` each show the full imported history, not one squashed commit.
 - [ ] Both frontends run via `pnpm run dev` and behave exactly as before, still against the Azure API.
-- [ ] `curl http://localhost:5000/api/health` returns the success envelope.
-- [ ] `curl http://localhost:5000/api/nope` returns `{"success":false,"errors":[{"message":"Route GET /api/nope not found"}]}`.
-- [ ] No `.env` file is tracked by git; `apps/api/.env.example` lists every variable the code reads.
+- [ ] `curl http://localhost:5050/api/health` returns the success envelope.
+- [ ] `curl http://localhost:5050/api/nope` returns `{"success":false,"errors":[{"message":"Route GET /api/nope not found"}]}`.
+- [ ] `apps/api/.env` is **not** tracked by git, and `apps/api/.env.example` lists every variable the code reads.
+- [ ] The two frontend `.env` files are still tracked, exactly as they were before the import. They hold only `VITE_*` values, which Vite compiles into the client bundle and are public by design — there is no secret in them. The API's `.env` is different: it will hold `JWT_SECRET`, Cloudinary, Paystack and SMTP credentials, and must never be committed.
 - [ ] Neither app declares its own contract types — every `src/types/*` file re-exports from `@learnbase/types`.
 
 ## What this phase deliberately does not do
