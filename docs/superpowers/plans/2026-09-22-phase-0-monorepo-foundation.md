@@ -169,6 +169,13 @@ strict-peer-dependencies=false
 
 Vite plugins and Radix declare wide peer ranges; without this, pnpm's strict resolution fails the install on dependencies the apps already use successfully.
 
+Note on `onlyBuiltDependencies` in the root `package.json` (Step 3): pnpm 10 and
+later block dependency lifecycle scripts by default. esbuild needs its
+`postinstall` to fetch the platform binary, and without it both Vite builds fail
+with a missing-binary error. If `pnpm install` prints "Ignored build scripts" for
+any other package, add that package to the same array and re-run
+`pnpm rebuild`.
+
 - [ ] **Step 3: Create the root `package.json`**
 
 ```json
@@ -176,9 +183,12 @@ Vite plugins and Radix declare wide peer ranges; without this, pnpm's strict res
   "name": "learnbase",
   "version": "0.0.0",
   "private": true,
-  "packageManager": "pnpm@9.12.0",
+  "packageManager": "pnpm@11.22.0",
   "engines": {
     "node": ">=20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
   },
   "scripts": {
     "build": "turbo run build",
