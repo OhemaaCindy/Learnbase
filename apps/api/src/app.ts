@@ -1,6 +1,7 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import helmet from "helmet";
+import type { MessageResponse } from "@learnbase/types";
 import { errorHandler } from "./shared/middleware/errorHandler.js";
 import { notFound } from "./shared/middleware/notFound.js";
 
@@ -26,7 +27,7 @@ export function createApp(): Express {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  app.get("/api/health", (_req, res) => {
+  app.get("/api/health", (_req, res: express.Response<MessageResponse>) => {
     res.status(200).json({
       success: true,
       message: "LearnBase API is running",

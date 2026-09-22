@@ -4,6 +4,7 @@ build/
 coverage/
 .turbo/
 *.log
+*.tsbuildinfo
 .DS_Store
 
 # API secrets: JWT, Cloudinary, Paystack, SMTP. Never commit.
