@@ -59,16 +59,12 @@ const LearnerProfile = ({ id }: { id: string }) => {
           <>
             <div className="flex justify-between">
               <p>Program</p>
-              {/* `course` was never part of the User/Learner contract the
-                  API returns; this always rendered the fallback. */}
-              <p>N/A</p>
+              <p>{learnerDetails?.course || "N/A"}</p>
             </div>
 
             <div className="flex justify-between">
               <p>Gender</p>
-              {/* `gender` was never part of the User/Learner contract the
-                  API returns; this always rendered the fallback. */}
-              <p>N/A</p>
+              <p>{learnerDetails?.gender || "N/A"}</p>
             </div>
 
             <div className="flex justify-between">
@@ -78,9 +74,7 @@ const LearnerProfile = ({ id }: { id: string }) => {
 
             <div className="flex justify-between">
               <p>Paid</p>
-              {/* `amount` was never part of the User/Learner contract the
-                  API returns; this always rendered the fallback. */}
-              <p>N/A</p>
+              <p>{learnerDetails?.amount || "N/A"}</p>
             </div>
 
             <div className="flex justify-between">
