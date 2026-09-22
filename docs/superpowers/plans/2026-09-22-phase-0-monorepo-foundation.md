@@ -169,12 +169,22 @@ strict-peer-dependencies=false
 
 Vite plugins and Radix declare wide peer ranges; without this, pnpm's strict resolution fails the install on dependencies the apps already use successfully.
 
-Note on `onlyBuiltDependencies` in the root `package.json` (Step 3): pnpm 10 and
-later block dependency lifecycle scripts by default. esbuild needs its
-`postinstall` to fetch the platform binary, and without it both Vite builds fail
-with a missing-binary error. If `pnpm install` prints "Ignored build scripts" for
-any other package, add that package to the same array and re-run
-`pnpm rebuild`.
+Also add an `allowBuilds` block to `pnpm-workspace.yaml` (Step 1):
+
+```yaml
+allowBuilds:
+  esbuild: true
+```
+
+pnpm 10 and later block dependency lifecycle scripts by default. esbuild needs
+its `postinstall` to fetch its platform binary, and without it both Vite builds
+fail with a missing-binary error.
+
+This belongs in `pnpm-workspace.yaml`, NOT in a `pnpm` field in `package.json`:
+pnpm 11 no longer reads that field at all, and the older `onlyBuiltDependencies`
+key was removed in favour of `allowBuilds`. If `pnpm install` fails with
+`ERR_PNPM_IGNORED_BUILDS` naming another package, run
+`pnpm approve-builds <pkg>` and commit the resulting `allowBuilds` entry.
 
 - [ ] **Step 3: Create the root `package.json`**
 
@@ -186,9 +196,6 @@ any other package, add that package to the same array and re-run
   "packageManager": "pnpm@11.22.0",
   "engines": {
     "node": ">=20"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
   },
   "scripts": {
     "build": "turbo run build",
