@@ -105,12 +105,21 @@ git commit -m "chore: import learner portal with history at apps/learner"
 - [ ] **Step 4: Verify the histories actually came across**
 
 ```bash
-git log --oneline -- apps/admin | wc -l
-git log --oneline -- apps/learner | wc -l
+git log --oneline "$(git rev-list -1 --grep='import admin portal' HEAD)^2" | wc -l
+git log --oneline "$(git rev-list -1 --grep='import learner portal' HEAD)^2" | wc -l
 test -f apps/admin/src/App.tsx && test -f apps/learner/src/App.tsx && echo "files present"
 ```
 
-Expected: both counts well above 1 (these are the imported commits, not a single squashed one), and `files present`. If a count is 1, the `read-tree` imported a snapshot without history — reset and redo Steps 2–3.
+Expected: counts in the dozens (73 and 66 at the time of writing), and `files present`.
+
+Each import commit has two parents: the prior HEAD and the source repo's tip. The imported history hangs off the **second** parent, which is why the check walks `^2`. Do not use `git log --oneline -- apps/admin` here — merge history-simplification follows only the first parent for a path that did not exist under either parent before the merge, so it reports `1` even on a perfectly good import.
+
+Also confirm the trees match their sources before deleting anything in Step 5:
+
+```bash
+diff <(git -C learnbase-admin ls-files | sort) <(git ls-files apps/admin | sed 's|^apps/admin/||' | sort) && echo "admin file list identical"
+diff <(git -C learnbase-learner-portal ls-files | sort) <(git ls-files apps/learner | sed 's|^apps/learner/||' | sort) && echo "learner file list identical"
+```
 
 - [ ] **Step 5: Remove the now-redundant source directories and remotes**
 
