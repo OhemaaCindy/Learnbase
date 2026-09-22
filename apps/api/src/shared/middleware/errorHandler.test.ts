@@ -55,6 +55,27 @@ describe("errorHandler", () => {
     expect(res.body.errors[0].message).toContain("Invalid");
   });
 
+  it("turns a mongoose validation error into a 400 with one entry per field", async () => {
+    const schema = new mongoose.Schema({
+      email: { type: String, required: true },
+      age: { type: Number, required: true },
+    });
+    const Model =
+      mongoose.models.ErrorHandlerTestModel ??
+      mongoose.model("ErrorHandlerTestModel", schema);
+    const doc = new Model({});
+    const validationError = doc.validateSync();
+    if (!validationError) {
+      throw new Error("expected validateSync to produce a ValidationError");
+    }
+
+    const res = await request(appThatThrows(validationError)).get("/boom");
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.errors).toHaveLength(2);
+  });
+
   it("turns a duplicate key violation into a 409", async () => {
     const duplicate = Object.assign(new Error("E11000 duplicate key"), {
       code: 11000,
