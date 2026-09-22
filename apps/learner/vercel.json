@@ -1,0 +1,14 @@
+
+
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://tmp-se-projectapi.azurewebsites.net/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
