@@ -1,6 +1,8 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import helmet from "helmet";
+import { errorHandler } from "./shared/middleware/errorHandler.js";
+import { notFound } from "./shared/middleware/notFound.js";
 
 /**
  * Builds the Express application without binding a port, so tests can
@@ -30,6 +32,9 @@ export function createApp(): Express {
       message: "LearnBase API is running",
     });
   });
+
+  app.use(notFound);
+  app.use(errorHandler);
 
   return app;
 }
