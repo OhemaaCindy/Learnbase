@@ -35,9 +35,10 @@ export const learnerColumns: ColumnDef<Learner>[] = [
   {
     header: "Courses",
     accessorKey: "course",
-    cell: ({ row }) => {
-      const learner = row.original.course || "N/A";
-      return <p>{learner}</p>;
+    cell: () => {
+      // `course` was never part of the User/Learner contract the API
+      // returns; this always rendered the fallback.
+      return <p>N/A</p>;
     },
   },
   {
@@ -52,16 +53,19 @@ export const learnerColumns: ColumnDef<Learner>[] = [
   {
     header: "Amount",
     accessorKey: "amount",
-    cell: ({ row }) => {
-      return <div className="">${row.original?.amount || "0.0"}</div>;
+    cell: () => {
+      // `amount` was never part of the User/Learner contract the API
+      // returns; this always rendered the fallback.
+      return <div className="">$0.0</div>;
     },
   },
   {
     header: "Gender",
     accessorKey: "learner",
-    cell: ({ row }) => {
-      const learner = row.original.gender || "N/A";
-      return <p>{learner}</p>;
+    cell: () => {
+      // `gender` was never part of the User/Learner contract the API
+      // returns; this always rendered the fallback.
+      return <p>N/A</p>;
     },
   },
   {

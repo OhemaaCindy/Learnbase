@@ -17,6 +17,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.2.1
         version: 5.9.1(react-hook-form@7.88.0(react@19.3.0))(zod@4.6.5)
+      '@learnbase/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@lottiefiles/dotlottie-react':
         specifier: ^0.14.4
         version: 0.14.4(react@19.3.0)
@@ -214,6 +217,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.2.1
         version: 5.9.1(react-hook-form@7.88.0(react@19.3.0))(zod@4.6.5)
+      '@learnbase/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@radix-ui/react-avatar':
         specifier: ^1.1.10
         version: 1.2.6(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
