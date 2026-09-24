@@ -6,6 +6,7 @@ import { signToken } from "../../shared/auth/jwt.js";
 import type { Mailer } from "../../shared/adapters/index.js";
 import { verificationEmail } from "../../shared/adapters/mailer.js";
 import { User, toPublicUser, BCRYPT_ROUNDS } from "./user.model.js";
+import type { UserDocument } from "./user.model.js";
 import type { LoginInput } from "./auth.schema.js";
 
 const OTP_TTL_MS = 15 * 60 * 1000;
@@ -84,4 +85,65 @@ export async function loginUser(
     token: signToken({ sub: user._id.toString(), role: user.role }),
     user: toPublicUser(user),
   };
+}
+
+const MAX_VERIFICATION_ATTEMPTS = 5;
+
+export async function verifyEmail(
+  userId: string,
+  submitted: string,
+): Promise<PublicUser> {
+  const user = await User.findById(userId).select(
+    "+verificationToken +verificationTokenExpiresAt +verificationAttempts",
+  );
+  if (!user) throw new AppError("Not authorised", 401);
+  if (user.isVerified) return toPublicUser(user);
+
+  if ((user.verificationAttempts ?? 0) >= MAX_VERIFICATION_ATTEMPTS) {
+    throw new AppError(
+      "Too many incorrect codes. Request a new one to try again.",
+      429,
+    );
+  }
+
+  const expired =
+    !user.verificationTokenExpiresAt ||
+    user.verificationTokenExpiresAt.getTime() < Date.now();
+
+  if (!user.verificationToken || expired) {
+    throw new AppError("That code has expired. Request a new one.", 400);
+  }
+
+  if (user.verificationToken !== submitted) {
+    user.verificationAttempts = (user.verificationAttempts ?? 0) + 1;
+    await user.save();
+    throw new AppError("That code is not correct", 400);
+  }
+
+  user.isVerified = true;
+  user.verificationToken = undefined;
+  user.verificationTokenExpiresAt = undefined;
+  user.verificationAttempts = 0;
+  await user.save();
+
+  return toPublicUser(user);
+}
+
+export async function resendVerification(
+  user: UserDocument,
+  mailer: Mailer,
+): Promise<void> {
+  if (user.isVerified) return;
+
+  const code = generateOtp();
+  await User.updateOne(
+    { _id: user._id },
+    {
+      verificationToken: code,
+      verificationTokenExpiresAt: new Date(Date.now() + OTP_TTL_MS),
+      verificationAttempts: 0,
+    },
+  );
+
+  await mailer.send({ to: user.email, ...verificationEmail(code) });
 }

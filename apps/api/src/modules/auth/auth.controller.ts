@@ -3,10 +3,16 @@ import type {
   AuthSuccessResponse,
   CheckAuthResponse,
   MessageResponse,
+  VerifyEmailResponse,
 } from "@learnbase/types";
 import type { AppDeps } from "../../shared/adapters/index.js";
-import { adminSignupSchema, learnerSignupSchema, loginSchema } from "./auth.schema.js";
-import { loginUser, registerUser } from "./auth.service.js";
+import {
+  adminSignupSchema,
+  learnerSignupSchema,
+  loginSchema,
+  verifyEmailSchema,
+} from "./auth.schema.js";
+import { loginUser, registerUser, verifyEmail, resendVerification } from "./auth.service.js";
 import { toPublicUser } from "./user.model.js";
 import { AppError } from "../../shared/errors/AppError.js";
 
@@ -58,3 +64,26 @@ export const logout = (
   // discarding it. The endpoint exists so both portals have something to call.
   res.status(200).json({ success: true, message: "Logged out" });
 };
+
+export const verifyEmailHandler = async (
+  req: Request,
+  res: Response<VerifyEmailResponse>,
+): Promise<void> => {
+  if (!req.user) throw new AppError("Not authorised", 401);
+  const { token } = verifyEmailSchema.parse(req.body);
+  const user = await verifyEmail(req.user._id.toString(), token);
+  res.status(200).json({ success: true, message: "Email verified", user });
+};
+
+export function resendToken(
+  deps: AppDeps,
+): (req: Request, res: Response<MessageResponse>) => Promise<void> {
+  return async (req, res) => {
+    if (!req.user) throw new AppError("Not authorised", 401);
+    await resendVerification(req.user, deps.mailer);
+    res.status(200).json({
+      success: true,
+      message: "If your account needs verifying, a new code is on its way.",
+    });
+  };
+}
