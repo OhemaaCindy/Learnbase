@@ -6,6 +6,8 @@ import { errorHandler } from "./shared/middleware/errorHandler.js";
 import { notFound } from "./shared/middleware/notFound.js";
 import { type AppDeps, createRealDeps } from "./shared/adapters/index.js";
 import { createAuthRouter } from "./modules/auth/auth.routes.js";
+import { logout } from "./modules/auth/auth.controller.js";
+import { authenticate } from "./shared/middleware/authenticate.js";
 
 /**
  * Builds the Express application without binding a port, so tests can
@@ -42,6 +44,10 @@ export function createApp(deps: AppDeps = createRealDeps()): Express {
   });
 
   app.use("/api/auth", createAuthRouter(deps));
+
+  // Outside /api/auth: both existing frontends call this exact path.
+  // Phase 6 adds /api/auth/logout alongside it.
+  app.post("/api/admin/auth/logout", authenticate, logout);
 
   app.use(notFound);
   app.use(errorHandler);

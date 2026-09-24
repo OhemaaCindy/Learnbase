@@ -5,6 +5,7 @@ import { signToken } from "../../shared/auth/jwt.js";
 import type { Mailer } from "../../shared/adapters/index.js";
 import { verificationEmail } from "../../shared/adapters/mailer.js";
 import { User, toPublicUser } from "./user.model.js";
+import type { LoginInput } from "./auth.schema.js";
 
 const OTP_TTL_MS = 15 * 60 * 1000;
 
@@ -43,6 +44,26 @@ export async function registerUser(
 
   return {
     token: signToken({ sub: user._id.toString(), role }),
+    user: toPublicUser(user),
+  };
+}
+
+export async function loginUser(
+  input: LoginInput,
+): Promise<{ token: string; user: PublicUser }> {
+  const user = await User.findOne({ email: input.email }).select("+password");
+
+  // One message for both branches so the endpoint cannot be used to discover
+  // which email addresses have accounts.
+  const invalid = new AppError("Invalid email or password", 401);
+  if (!user || user.disabled) throw invalid;
+  if (!(await user.comparePassword(input.password))) throw invalid;
+
+  user.lastLogin = new Date();
+  await user.save();
+
+  return {
+    token: signToken({ sub: user._id.toString(), role: user.role }),
     user: toPublicUser(user),
   };
 }
