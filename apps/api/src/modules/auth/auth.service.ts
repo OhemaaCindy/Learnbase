@@ -4,7 +4,8 @@ import type { Role, User as PublicUser } from "@learnbase/types";
 import { AppError } from "../../shared/errors/AppError.js";
 import { signToken } from "../../shared/auth/jwt.js";
 import type { Mailer } from "../../shared/adapters/index.js";
-import { verificationEmail } from "../../shared/adapters/mailer.js";
+import { verificationEmail, resetPasswordEmail } from "../../shared/adapters/mailer.js";
+import { assertAllowedResetUrl } from "../../shared/auth/clientOrigins.js";
 import { User, toPublicUser, BCRYPT_ROUNDS } from "./user.model.js";
 import type { UserDocument } from "./user.model.js";
 import type { LoginInput } from "./auth.schema.js";
@@ -146,4 +147,54 @@ export async function resendVerification(
   );
 
   await mailer.send({ to: user.email, ...verificationEmail(code) });
+}
+
+const RESET_TTL_MS = 60 * 60 * 1000;
+
+function hashToken(raw: string): string {
+  return crypto.createHash("sha256").update(raw).digest("hex");
+}
+
+export async function requestPasswordReset(
+  rawEmail: string,
+  baseResetURL: string,
+  mailer: Mailer,
+): Promise<void> {
+  // Validate the URL before any lookup, so a bad URL is rejected the same way
+  // whether or not the account exists.
+  const base = assertAllowedResetUrl(baseResetURL);
+
+  const user = await User.findOne({ email: rawEmail });
+  if (!user) return; // Same response either way — no account enumeration.
+
+  const raw = crypto.randomBytes(32).toString("hex");
+  await User.updateOne(
+    { _id: user._id },
+    {
+      resetPasswordToken: hashToken(raw),
+      resetPasswordExpiresAt: new Date(Date.now() + RESET_TTL_MS),
+    },
+  );
+
+  const link = `${base.replace(/\/+$/, "")}/${raw}`;
+  await mailer.send({ to: user.email, ...resetPasswordEmail(link) });
+}
+
+export async function resetPassword(
+  rawToken: string,
+  newPassword: string,
+): Promise<void> {
+  const user = await User.findOne({
+    resetPasswordToken: hashToken(rawToken),
+    resetPasswordExpiresAt: { $gt: new Date() },
+  }).select("+password +resetPasswordToken +resetPasswordExpiresAt");
+
+  if (!user) {
+    throw new AppError("That reset link is invalid or has expired", 400);
+  }
+
+  user.password = newPassword; // pre-save hook hashes it
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpiresAt = undefined;
+  await user.save();
 }

@@ -11,8 +11,17 @@ import {
   learnerSignupSchema,
   loginSchema,
   verifyEmailSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } from "./auth.schema.js";
-import { loginUser, registerUser, verifyEmail, resendVerification } from "./auth.service.js";
+import {
+  loginUser,
+  registerUser,
+  verifyEmail,
+  resendVerification,
+  requestPasswordReset,
+  resetPassword,
+} from "./auth.service.js";
 import { toPublicUser } from "./user.model.js";
 import { AppError } from "../../shared/errors/AppError.js";
 
@@ -87,3 +96,29 @@ export function resendToken(
     });
   };
 }
+
+export function forgotPassword(
+  deps: AppDeps,
+): (req: Request, res: Response<MessageResponse>) => Promise<void> {
+  return async (req, res) => {
+    const input = forgotPasswordSchema.parse(req.body);
+    await requestPasswordReset(input.email, input.baseResetURL, deps.mailer);
+    res.status(200).json({
+      success: true,
+      message: "If that email has an account, a reset link is on its way.",
+    });
+  };
+}
+
+export const resetPasswordHandler = async (
+  req: Request,
+  res: Response<MessageResponse>,
+): Promise<void> => {
+  const { password } = resetPasswordSchema.parse(req.body);
+  const rawToken = req.params.id;
+  if (typeof rawToken !== "string") {
+    throw new AppError("That reset link is invalid or has expired", 400);
+  }
+  await resetPassword(rawToken, password);
+  res.status(200).json({ success: true, message: "Password updated" });
+};

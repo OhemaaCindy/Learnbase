@@ -7,6 +7,8 @@ import {
   signupLearner,
   verifyEmailHandler,
   resendToken,
+  forgotPassword,
+  resetPasswordHandler,
 } from "./auth.controller.js";
 import { authenticate } from "../../shared/middleware/authenticate.js";
 import { loginLimiter, otpLimiter, emailLimiter } from "../../shared/rateLimit.js";
@@ -19,5 +21,7 @@ export function createAuthRouter(deps: AppDeps): Router {
   router.get("/check-auth", authenticate, checkAuth);
   router.post("/verify-email", authenticate, otpLimiter, verifyEmailHandler);
   router.post("/resend-token", authenticate, emailLimiter, resendToken(deps));
+  router.post("/forgot-password", emailLimiter, forgotPassword(deps));
+  router.post("/reset-password/:id", resetPasswordHandler);
   return router;
 }

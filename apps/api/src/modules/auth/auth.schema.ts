@@ -55,3 +55,13 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export const verifyEmailSchema = z.object({
   token: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit code from your email"),
 });
+
+export const forgotPasswordSchema = z.object({
+  email,
+  baseResetURL: z.string().trim().min(1, "baseResetURL is required"),
+});
+
+export const resetPasswordSchema = withConfirmation({
+  password,
+  confirmPassword: z.string(),
+});
