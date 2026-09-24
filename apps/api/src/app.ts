@@ -5,6 +5,7 @@ import type { MessageResponse } from "@learnbase/types";
 import { errorHandler } from "./shared/middleware/errorHandler.js";
 import { notFound } from "./shared/middleware/notFound.js";
 import { type AppDeps, createRealDeps } from "./shared/adapters/index.js";
+import { createAuthRouter } from "./modules/auth/auth.routes.js";
 
 /**
  * Builds the Express application without binding a port, so tests can
@@ -39,6 +40,8 @@ export function createApp(deps: AppDeps = createRealDeps()): Express {
       message: "LearnBase API is running",
     });
   });
+
+  app.use("/api/auth", createAuthRouter(deps));
 
   app.use(notFound);
   app.use(errorHandler);
