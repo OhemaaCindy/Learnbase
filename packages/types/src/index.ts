@@ -44,3 +44,5 @@ export type {
   EnrollmentPayload,
   EnrollmentResponse,
 } from "./invoice.js";
+
+export type { JsonOf } from "./json.js";
