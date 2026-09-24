@@ -18,6 +18,22 @@ function isDuplicateKeyError(err: unknown): err is DuplicateKeyError {
   );
 }
 
+const SECRET_PATTERNS: RegExp[] = [
+  /\/\/[^/\s:@]+:[^/\s:@]+@/g,        // credentials inside any URL
+  /\bBearer\s+[\w-]+\.[\w-]+\.[\w-]+/gi, // JWTs
+  /\b[\w.-]+:[^\s@]{6,}@[\w.-]+\b/g,  // user:pass@host outside a URL
+];
+
+/** Masks credentials that routinely appear inside driver and SMTP error text. */
+export function redactSecrets(text: string): string {
+  return SECRET_PATTERNS.reduce(
+    (acc, pattern) => acc.replace(pattern, (match) =>
+      match.includes("//") ? "//[REDACTED]@" : "[REDACTED]",
+    ),
+    text,
+  );
+}
+
 /**
  * Converts every failure into `{ success: false, errors: [{ message }] }`.
  * Mounted last, so no controller ever formats an error itself.
@@ -62,6 +78,9 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     return send(409, [`A record with that ${field} already exists`]);
   }
 
-  console.error("Unhandled error:", err);
+  console.error(
+    "Unhandled error:",
+    redactSecrets(err instanceof Error ? `${err.message}\n${err.stack ?? ""}` : String(err)),
+  );
   return send(500, ["Something went wrong"]);
 };

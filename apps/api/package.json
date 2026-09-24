@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@learnbase/types": "workspace:*",
@@ -21,15 +22,19 @@
     "zod": "^4.0.5"
   },
   "devDependencies": {
+    "@eslint/js": "^9.30.1",
     "@learnbase/tsconfig": "workspace:*",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/node": "^24.0.15",
     "@types/supertest": "^6.0.2",
+    "eslint": "^9.30.1",
+    "globals": "^16.3.0",
     "mongodb-memory-server": "^10.1.3",
     "supertest": "^7.0.0",
     "tsx": "^4.19.2",
     "typescript": "~5.8.3",
+    "typescript-eslint": "^8.35.1",
     "vitest": "^2.1.8"
   }
 }

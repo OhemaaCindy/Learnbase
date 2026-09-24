@@ -4,7 +4,7 @@ import request from "supertest";
 import { ZodError, z } from "zod";
 import mongoose from "mongoose";
 import { AppError } from "../errors/AppError.js";
-import { errorHandler } from "./errorHandler.js";
+import { errorHandler, redactSecrets } from "./errorHandler.js";
 import { createApp } from "../../app.js";
 
 function appThatThrows(error: unknown) {
@@ -107,5 +107,26 @@ describe("notFound", () => {
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);
     expect(res.body.errors[0].message).toContain("not found");
+  });
+});
+
+describe("redactSecrets", () => {
+  it("masks a mongodb connection string", () => {
+    const text = "failed to connect to mongodb+srv://admin:hunter2@cluster0.mongodb.net/db";
+    const out = redactSecrets(text);
+    expect(out).not.toContain("hunter2");
+    expect(out).toContain("[REDACTED]");
+  });
+
+  it("masks an smtp url and a bearer token", () => {
+    const out = redactSecrets(
+      "smtp://user:s3cr3t@smtp-relay.brevo.com:587 Authorization: Bearer abc.def.ghi",
+    );
+    expect(out).not.toContain("s3cr3t");
+    expect(out).not.toContain("abc.def.ghi");
+  });
+
+  it("leaves ordinary text untouched", () => {
+    expect(redactSecrets("Track not found")).toBe("Track not found");
   });
 });
