@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { createApp } from "./app.js";
 import { connectDB } from "./shared/db.js";
+import { createRealDeps } from "./shared/adapters/index.js";
 
 const port = Number(process.env.PORT ?? 5050);
 const mongoUri = process.env.MONGODB_URI;
@@ -14,7 +15,7 @@ async function start(): Promise<void> {
   await connectDB(mongoUri!);
   console.log("Connected to MongoDB");
 
-  createApp().listen(port, () => {
+  createApp(createRealDeps()).listen(port, () => {
     console.log(`LearnBase API listening on http://localhost:${port}`);
   });
 }

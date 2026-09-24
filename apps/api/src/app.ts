@@ -4,13 +4,19 @@ import helmet from "helmet";
 import type { MessageResponse } from "@learnbase/types";
 import { errorHandler } from "./shared/middleware/errorHandler.js";
 import { notFound } from "./shared/middleware/notFound.js";
+import { type AppDeps, createRealDeps } from "./shared/adapters/index.js";
 
 /**
  * Builds the Express application without binding a port, so tests can
  * mount it with supertest and the process entry point stays separate.
+ *
+ * `deps` defaults to the real adapters (e.g. Brevo mail over SMTP), which
+ * are constructed lazily so importing/calling this with no arguments in
+ * tests never opens a network connection. Tests inject fakes instead.
  */
-export function createApp(): Express {
+export function createApp(deps: AppDeps = createRealDeps()): Express {
   const app = express();
+  app.set("deps", deps);
 
   const allowedOrigins = [
     process.env.CLIENT_ADMIN_URL ?? "http://localhost:5173",
