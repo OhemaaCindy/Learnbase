@@ -18,18 +18,20 @@ function isDuplicateKeyError(err: unknown): err is DuplicateKeyError {
   );
 }
 
-const SECRET_PATTERNS: RegExp[] = [
-  /\/\/[^/\s:@]+:[^/\s:@]+@/g,        // credentials inside any URL
-  /\bBearer\s+[\w-]+\.[\w-]+\.[\w-]+/gi, // JWTs
-  /\b[\w.-]+:[^\s@]{6,}@[\w.-]+\b/g,  // user:pass@host outside a URL
+const SECRET_PATTERNS: { pattern: RegExp; replacement: string }[] = [
+  // credentials inside a URL — keep scheme and host, drop user:pass
+  { pattern: /(\w+:\/\/)[^/\s:@]+:[^/\s:@]+@/g, replacement: "$1[REDACTED]@" },
+  // bearer tokens
+  { pattern: /\b(Bearer\s+)[\w-]+\.[\w-]+\.[\w-]+/gi, replacement: "$1[REDACTED]" },
+  // user:pass@host outside a URL. The password class excludes / [ ] so this can
+  // never traverse an already-redacted value or a filesystem path.
+  { pattern: /\b([\w.-]+):[^\s@/[\]]{6,}@([\w.-]+)\b/g, replacement: "$1:[REDACTED]@$2" },
 ];
 
 /** Masks credentials that routinely appear inside driver and SMTP error text. */
 export function redactSecrets(text: string): string {
   return SECRET_PATTERNS.reduce(
-    (acc, pattern) => acc.replace(pattern, (match) =>
-      match.includes("//") ? "//[REDACTED]@" : "[REDACTED]",
-    ),
+    (acc, { pattern, replacement }) => acc.replace(pattern, replacement),
     text,
   );
 }

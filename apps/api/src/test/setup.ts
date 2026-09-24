@@ -7,10 +7,10 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
-  const { collections } = mongoose.connection;
-  await Promise.all(
-    Object.values(collections).map((collection) => collection.deleteMany({})),
-  );
+  const db = mongoose.connection.db;
+  if (!db) return;
+  const collections = await db.collections();
+  await Promise.all(collections.map((collection) => collection.deleteMany({})));
 });
 
 afterAll(async () => {

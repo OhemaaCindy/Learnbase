@@ -129,4 +129,18 @@ describe("redactSecrets", () => {
   it("leaves ordinary text untouched", () => {
     expect(redactSecrets("Track not found")).toBe("Track not found");
   });
+
+  it("redacts credentials but preserves surrounding diagnostic context", () => {
+    const out = redactSecrets(
+      "mongodb+srv://admin:hunter2@cluster0.mongodb.net/db",
+    );
+    expect(out).not.toContain("hunter2");
+    expect(out).toContain("cluster0.mongodb.net");
+  });
+
+  it("does not mangle an ordinary node_modules stack trace line", () => {
+    const line =
+      "file:///Users/x/node_modules/.pnpm/@vitest+runner@2.1.9/dist/index.js:1271:3";
+    expect(redactSecrets(line)).toBe(line);
+  });
 });
