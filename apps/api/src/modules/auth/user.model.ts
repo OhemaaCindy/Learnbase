@@ -2,7 +2,7 @@ import mongoose, { Schema, model, type Document, type Model } from "mongoose";
 import bcrypt from "bcrypt";
 import type { Role, User as PublicUser } from "@learnbase/types";
 
-const BCRYPT_ROUNDS = 12;
+export const BCRYPT_ROUNDS = 12;
 
 export interface UserDocument extends Document {
   _id: mongoose.Types.ObjectId;

@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
+import bcrypt from "bcrypt";
 import { createApp } from "../../app.js";
 import { User } from "./user.model.js";
 import { fakeMailer, fakeImageStore } from "../../test/factories.js";
@@ -84,6 +85,64 @@ describe("POST /api/auth/login", () => {
       .post("/api/auth/login")
       .send({ email: "ada@example.com", password: "Password123" });
     expect(res.status).toBe(401);
+  });
+
+  // Timing-oracle regression: an unknown email must pay the same bcrypt cost
+  // as a real comparison, or response timing reveals account existence even
+  // though the response body doesn't. Asserting on the mechanism (was
+  // bcrypt.compare invoked?) rather than the clock keeps this deterministic.
+  it("compares against a dummy hash for an unknown email", async () => {
+    const compareSpy = vi.spyOn(bcrypt, "compare");
+    const res = await request(appWith())
+      .post("/api/auth/login")
+      .send({ email: "nobody@example.com", password: "Password123" });
+
+    expect(res.status).toBe(401);
+    expect(compareSpy).toHaveBeenCalled();
+    compareSpy.mockRestore();
+  });
+
+  it("compares against a dummy hash for a disabled account", async () => {
+    await seedLearner({ disabled: true });
+    const compareSpy = vi.spyOn(bcrypt, "compare");
+    const res = await request(appWith())
+      .post("/api/auth/login")
+      .send({ email: "ada@example.com", password: "Password123" });
+
+    expect(res.status).toBe(401);
+    expect(compareSpy).toHaveBeenCalled();
+    compareSpy.mockRestore();
+  });
+
+  // Loose secondary signal only — the spy assertions above are the real
+  // regression test. Generous bound to avoid CI flakiness; both paths run
+  // against an in-memory Mongo instance and pay one bcrypt-12 compare each.
+  it("keeps unknown-email and wrong-password timing within a generous bound", async () => {
+    await seedLearner();
+    const iterations = 5;
+
+    const measure = async (email: string, password: string): Promise<number> => {
+      const start = process.hrtime.bigint();
+      await request(appWith()).post("/api/auth/login").send({ email, password });
+      return Number(process.hrtime.bigint() - start) / 1_000_000;
+    };
+
+    const median = (values: number[]): number => {
+      const sorted = [...values].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 === 0
+        ? (sorted[mid - 1]! + sorted[mid]!) / 2
+        : sorted[mid]!;
+    };
+
+    const unknownTimes: number[] = [];
+    const wrongTimes: number[] = [];
+    for (let i = 0; i < iterations; i++) {
+      unknownTimes.push(await measure("nobody@example.com", "Password123"));
+      wrongTimes.push(await measure("ada@example.com", "WrongPassword1"));
+    }
+
+    expect(Math.abs(median(unknownTimes) - median(wrongTimes))).toBeLessThan(100);
   });
 });
 

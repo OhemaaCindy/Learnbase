@@ -1,13 +1,26 @@
 import crypto from "node:crypto";
+import bcrypt from "bcrypt";
 import type { Role, User as PublicUser } from "@learnbase/types";
 import { AppError } from "../../shared/errors/AppError.js";
 import { signToken } from "../../shared/auth/jwt.js";
 import type { Mailer } from "../../shared/adapters/index.js";
 import { verificationEmail } from "../../shared/adapters/mailer.js";
-import { User, toPublicUser } from "./user.model.js";
+import { User, toPublicUser, BCRYPT_ROUNDS } from "./user.model.js";
 import type { LoginInput } from "./auth.schema.js";
 
 const OTP_TTL_MS = 15 * 60 * 1000;
+
+/**
+ * A bcrypt hash of a random value nobody will ever submit, at the same cost
+ * factor as real user passwords. Compared against on every "no such user" /
+ * "disabled account" failure so those paths cost the same as a real
+ * comparison — otherwise the ~O(100ms) bcrypt gap between "ran a compare"
+ * and "didn't" answers "does this email have an account?" through response
+ * timing, even though the response body is identical. Generated once at
+ * module load (~cost-factor-12 bcrypt hash, a few hundred ms), which is
+ * negligible against a server process's lifetime.
+ */
+const DUMMY_HASH = bcrypt.hashSync(crypto.randomBytes(16).toString("hex"), BCRYPT_ROUNDS);
 
 /** Six digits, uniformly distributed, from a CSPRNG. */
 export function generateOtp(): string {
@@ -56,7 +69,12 @@ export async function loginUser(
   // One message for both branches so the endpoint cannot be used to discover
   // which email addresses have accounts.
   const invalid = new AppError("Invalid email or password", 401);
-  if (!user || user.disabled) throw invalid;
+  if (!user || user.disabled) {
+    // Pay the same bcrypt cost a real comparison would, so this branch
+    // can't be distinguished from a wrong-password failure by timing.
+    await bcrypt.compare(input.password, DUMMY_HASH);
+    throw invalid;
+  }
   if (!(await user.comparePassword(input.password))) throw invalid;
 
   user.lastLogin = new Date();
