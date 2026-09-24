@@ -77,6 +77,37 @@ describe("POST /api/auth/forgot-password", () => {
     expect(sent).toHaveLength(0);
   });
 
+  it("keeps a backslash-disguised userinfo attack from reaching the emailed link", async () => {
+    const { app, sent } = appWith();
+    const res = await request(app)
+      .post("/api/auth/forgot-password")
+      .send({
+        email: "ada@example.com",
+        baseResetURL: `${LEARNER_ORIGIN}\\@evil.test/reset-password`,
+      });
+
+    if (res.status !== 200) {
+      expect(res.status).toBe(400);
+      expect(sent).toHaveLength(0);
+      return;
+    }
+
+    // WHATWG's `new URL(...).origin` treats the backslash as a path
+    // separator, so the request is accepted (`.origin` reports the allowed
+    // learner origin). The vulnerability is what happens next: if the RAW
+    // candidate — still carrying the literal backslash — is what gets
+    // emailed, an RFC 3986 parser downstream (curl, Python, a mail-scanner)
+    // keeps that backslash inside the authority and resolves the link to
+    // evil.test instead. Checking the link's host with Node's own `new URL()`
+    // would NOT catch this: Node applies the same WHATWG normalisation on
+    // read-back, so a backslash-carrying link and its fixed, re-serialised
+    // form report the identical host here. The presence of a literal
+    // backslash in the link actually sent is the real signal.
+    const link = linkFrom(sent[0]!.text);
+    expect(link).not.toContain("\\");
+    expect(new URL(link).host).toBe(new URL(LEARNER_ORIGIN).host);
+  });
+
   it("refuses a non-absolute baseResetURL", async () => {
     const { app, sent } = appWith();
     const res = await request(app)

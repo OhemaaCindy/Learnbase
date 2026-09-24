@@ -2,8 +2,8 @@ import { AppError } from "../errors/AppError.js";
 
 export function allowedOrigins(): string[] {
   return [
-    process.env.CLIENT_ADMIN_URL,
-    process.env.CLIENT_LEARNER_URL,
+    process.env.CLIENT_ADMIN_URL ?? "http://localhost:5173",
+    process.env.CLIENT_LEARNER_URL ?? "http://localhost:5174",
   ].filter((value): value is string => Boolean(value));
 }
 
@@ -40,5 +40,8 @@ export function assertAllowedResetUrl(candidate: string): string {
     throw new AppError("That reset URL is not allowed", 400);
   }
 
-  return candidate;
+  // Return the PARSED url, never the caller's raw string: validating one
+  // representation and using another is how `https://good.example\@evil.test`
+  // passes a WHATWG origin check and still resolves to evil.test under RFC 3986.
+  return parsed.href;
 }
