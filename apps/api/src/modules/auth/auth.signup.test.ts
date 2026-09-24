@@ -82,6 +82,12 @@ describe("POST /api/auth/signup/admin", () => {
       .post("/api/auth/signup/admin")
       .send({ ...payload, email: "  ADA@Example.COM " });
     expect(res.status).toBe(409);
+    // Must come from the service's own duplicate check, which only fires if the
+    // schema normalised the email before the lookup. The unique-index fallback
+    // produces "A record with that email already exists" instead.
+    expect(res.body.errors[0].message).toBe(
+      "An account with that email already exists",
+    );
     expect(await User.countDocuments()).toBe(1);
   });
 
