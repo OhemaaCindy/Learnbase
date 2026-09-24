@@ -8,7 +8,8 @@ import { verificationEmail, resetPasswordEmail } from "../../shared/adapters/mai
 import { assertAllowedResetUrl } from "../../shared/auth/clientOrigins.js";
 import { User, toPublicUser, BCRYPT_ROUNDS } from "./user.model.js";
 import type { UserDocument } from "./user.model.js";
-import type { LoginInput } from "./auth.schema.js";
+import type { LoginInput, UpdateProfileInput } from "./auth.schema.js";
+import type { ImageStore } from "../../shared/adapters/index.js";
 
 const OTP_TTL_MS = 15 * 60 * 1000;
 
@@ -197,4 +198,37 @@ export async function resetPassword(
   user.resetPasswordToken = undefined;
   user.resetPasswordExpiresAt = undefined;
   await user.save();
+}
+
+export async function changePassword(
+  userId: string,
+  newPassword: string,
+): Promise<void> {
+  const user = await User.findById(userId).select("+password");
+  if (!user) throw new AppError("Not authorised", 401);
+  user.password = newPassword;
+  await user.save();
+}
+
+export async function updateProfile(
+  userId: string,
+  fields: UpdateProfileInput,
+  file: Buffer | undefined,
+  imageStore: ImageStore,
+): Promise<PublicUser> {
+  const user = await User.findById(userId);
+  if (!user) throw new AppError("Not authorised", 401);
+
+  if (file) {
+    user.profileImage = await imageStore.upload(file, "learnbase/profiles");
+  }
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== undefined) {
+      (user as unknown as Record<string, unknown>)[key] = value;
+    }
+  }
+
+  await user.save();
+  return toPublicUser(user);
 }

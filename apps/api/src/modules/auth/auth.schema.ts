@@ -65,3 +65,27 @@ export const resetPasswordSchema = withConfirmation({
   password,
   confirmPassword: z.string(),
 });
+
+export const changePasswordSchema = withConfirmation({
+  password,
+  confirmPassword: z.string(),
+});
+
+/**
+ * Deliberately an allowlist. Anything not named here — email, role, password,
+ * isVerified — is dropped, so a client cannot escalate its own privileges by
+ * adding fields to the form.
+ */
+export const updateProfileSchema = z.object({
+  firstName: z.string().trim().min(1).optional(),
+  lastName: z.string().trim().min(1).optional(),
+  contact: z.string().trim().optional(),
+  location: z.string().trim().optional(),
+  description: z.string().trim().optional(),
+  disabled: z
+    .union([z.boolean(), z.enum(["true", "false"])])
+    .transform((value) => value === true || value === "true")
+    .optional(),
+});
+
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

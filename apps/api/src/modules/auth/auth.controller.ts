@@ -4,6 +4,7 @@ import type {
   CheckAuthResponse,
   MessageResponse,
   VerifyEmailResponse,
+  UpdateUserResponse,
 } from "@learnbase/types";
 import type { AppDeps } from "../../shared/adapters/index.js";
 import {
@@ -13,6 +14,8 @@ import {
   verifyEmailSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  changePasswordSchema,
+  updateProfileSchema,
 } from "./auth.schema.js";
 import {
   loginUser,
@@ -21,6 +24,8 @@ import {
   resendVerification,
   requestPasswordReset,
   resetPassword,
+  changePassword,
+  updateProfile,
 } from "./auth.service.js";
 import { toPublicUser } from "./user.model.js";
 import { AppError } from "../../shared/errors/AppError.js";
@@ -122,3 +127,29 @@ export const resetPasswordHandler = async (
   await resetPassword(rawToken, password);
   res.status(200).json({ success: true, message: "Password updated" });
 };
+
+export const changePasswordHandler = async (
+  req: Request,
+  res: Response<MessageResponse>,
+): Promise<void> => {
+  if (!req.user) throw new AppError("Not authorised", 401);
+  const { password } = changePasswordSchema.parse(req.body);
+  await changePassword(req.user._id.toString(), password);
+  res.status(200).json({ success: true, message: "Password updated" });
+};
+
+export function updateProfileHandler(
+  deps: AppDeps,
+): (req: Request, res: Response<UpdateUserResponse>) => Promise<void> {
+  return async (req, res) => {
+    if (!req.user) throw new AppError("Not authorised", 401);
+    const fields = updateProfileSchema.parse(req.body);
+    const user = await updateProfile(
+      req.user._id.toString(),
+      fields,
+      req.file?.buffer,
+      deps.imageStore,
+    );
+    res.status(200).json({ success: true, message: "Profile updated", user });
+  };
+}
