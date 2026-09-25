@@ -30,7 +30,7 @@ export function ForgotPasswordForm({
   const onSubmit = async (data: ForgotPasswordFormData) => {
     console.log(data);
     requestReset(
-      { ...data, baseResetURL: `${import.meta.env.BASE_URL}/reset-password` },
+      { ...data, baseResetURL: `${import.meta.env.VITE_CLIENT_URL}/reset-password` },
       {
         onSuccess() {
           reset();

@@ -1,4 +1,4 @@
-import type { Request, RequestHandler, Response } from "express";
+import type { Request, Response } from "express";
 import type {
   AuthSuccessResponse,
   CheckAuthResponse,
@@ -30,7 +30,9 @@ import {
 import { toPublicUser } from "./user.model.js";
 import { AppError } from "../../shared/errors/AppError.js";
 
-export function signupAdmin(deps: AppDeps): RequestHandler {
+export function signupAdmin(
+  deps: AppDeps,
+): (req: Request, res: Response<AuthSuccessResponse>) => Promise<void> {
   return async (req, res) => {
     const input = adminSignupSchema.parse(req.body);
     const result = await registerUser(input, "Admin", deps.mailer);
@@ -42,7 +44,9 @@ export function signupAdmin(deps: AppDeps): RequestHandler {
   };
 }
 
-export function signupLearner(deps: AppDeps): RequestHandler {
+export function signupLearner(
+  deps: AppDeps,
+): (req: Request, res: Response<AuthSuccessResponse>) => Promise<void> {
   return async (req, res) => {
     const input = learnerSignupSchema.parse(req.body);
     const result = await registerUser(input, "Learner", deps.mailer);
