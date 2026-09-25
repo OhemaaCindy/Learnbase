@@ -85,11 +85,13 @@ and each is the kind that passes every functional test.
 
 ## Outstanding before Phase 5 cutover
 
-- **No real email has ever been sent.** The live Brevo round-trip was attempted and failed
-  with `Missing credentials for PLAIN` — `apps/api/.env` has no `SMTP_USER`,
-  `SMTP_PASSWORD` or `MAIL_FROM`. Every email test runs against a fake at the adapter seam.
-  This is a hard gate: run one real signup and verification before pointing any frontend at
-  this API.
+- ~~No real email has ever been sent.~~ **DONE 2026-09-25.** The live round-trip was
+  completed against real Brevo and real Atlas: `POST /auth/signup/learner` returned 201 with
+  no field leaks, Brevo accepted the send, the email was **confirmed delivered to a real
+  inbox**, and verification succeeded with the emailed code. The test user was deleted
+  afterwards. Note the sender is a gmail.com address — that worked, but a custom verified
+  domain is worth setting up before production volume, since free-provider senders are the
+  usual cause of DMARC failures.
 - **`TRUST_PROXY` must match the host's proxy depth.** It defaults to 0. Behind a reverse
   proxy (Vercel, Render, Railway, Fly) set it to 1, or every request shares one IP and all
   three rate limiters collapse into a single global bucket — one user could lock out
