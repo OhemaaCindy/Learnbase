@@ -40,6 +40,14 @@ export function assertAllowedResetUrl(candidate: string): string {
     throw new AppError("That reset URL is not allowed", 400);
   }
 
+  // Strip userinfo before returning: `.origin` ignores it, so
+  // `https://evil.test@learner.example.com/reset` passes the check above
+  // (the origin really is learner.example.com, no token is exfiltrated) but
+  // would otherwise be emailed back out verbatim, reading as a link that
+  // leads with "evil.test@" — a phishing tell we don't need to ship.
+  parsed.username = "";
+  parsed.password = "";
+
   // Return the PARSED url, never the caller's raw string: validating one
   // representation and using another is how `https://good.example\@evil.test`
   // passes a WHATWG origin check and still resolves to evil.test under RFC 3986.

@@ -4,9 +4,11 @@ import crypto from "node:crypto";
 import { createApp } from "../../app.js";
 import { User } from "./user.model.js";
 import { fakeMailer, fakeImageStore } from "../../test/factories.js";
+import { flushPendingSends } from "./auth.service.js";
+import { signToken } from "../../shared/auth/jwt.js";
 
-function appWith() {
-  const mail = fakeMailer();
+function appWith(mailerOptions?: Parameters<typeof fakeMailer>[0]) {
+  const mail = fakeMailer(mailerOptions);
   const images = fakeImageStore();
   return { app: createApp({ mailer: mail.mailer, imageStore: images.imageStore }), sent: mail.sent };
 }
@@ -38,6 +40,9 @@ describe("POST /api/auth/forgot-password", () => {
       .send({ email: "ada@example.com", baseResetURL: `${LEARNER_ORIGIN}/reset-password` });
 
     expect(res.status).toBe(200);
+    // The send happens after the response, not before it — see C1 in the
+    // review. Await it explicitly rather than assuming it already landed.
+    await flushPendingSends();
     expect(sent).toHaveLength(1);
     expect(linkFrom(sent[0]!.text)).toContain(`${LEARNER_ORIGIN}/reset-password/`);
   });
@@ -85,6 +90,7 @@ describe("POST /api/auth/forgot-password", () => {
         email: "ada@example.com",
         baseResetURL: `${LEARNER_ORIGIN}\\@evil.test/reset-password`,
       });
+    await flushPendingSends();
 
     if (res.status !== 200) {
       expect(res.status).toBe(400);
@@ -122,10 +128,12 @@ describe("POST /api/auth/forgot-password", () => {
     const known = await request(app)
       .post("/api/auth/forgot-password")
       .send({ email: "ada@example.com", baseResetURL: `${LEARNER_ORIGIN}/reset-password` });
+    await flushPendingSends();
     sent.length = 0;
     const unknown = await request(app)
       .post("/api/auth/forgot-password")
       .send({ email: "nobody@example.com", baseResetURL: `${LEARNER_ORIGIN}/reset-password` });
+    await flushPendingSends();
 
     expect(unknown.status).toBe(known.status);
     expect(unknown.body.message).toBe(known.body.message);
@@ -138,6 +146,7 @@ describe("POST /api/auth/forgot-password", () => {
       .post("/api/auth/forgot-password")
       .send({ email: "ada@example.com", baseResetURL: `${ADMIN_ORIGIN}/reset-password` });
 
+    await flushPendingSends();
     const raw = linkFrom(sent[0]!.text).split("/").pop()!;
     const user = await User.findOne({ email: "ada@example.com" }).select("+resetPasswordToken");
     expect(user?.resetPasswordToken).toBeDefined();
@@ -145,6 +154,33 @@ describe("POST /api/auth/forgot-password", () => {
     expect(user?.resetPasswordToken).toBe(
       crypto.createHash("sha256").update(raw).digest("hex"),
     );
+  });
+
+  // C1 regression: the send used to be awaited on the response path, so a
+  // slow mailer made a known-email response slow while an unknown-email
+  // response stayed instant — an identical body with a very different
+  // clock is still an oracle. Fails against the old awaited-send behaviour
+  // (known ~300ms slower) and passes once the send happens after responding.
+  it("responds in comparable time for a known and an unknown email, even with a slow mailer", async () => {
+    const { app, sent } = appWith({ delayMs: 300 });
+
+    const measure = async (email: string): Promise<number> => {
+      const start = process.hrtime.bigint();
+      await request(app)
+        .post("/api/auth/forgot-password")
+        .send({ email, baseResetURL: `${LEARNER_ORIGIN}/reset-password` });
+      return Number(process.hrtime.bigint() - start) / 1_000_000;
+    };
+
+    const knownMs = await measure("ada@example.com");
+    const unknownMs = await measure("nobody@example.com");
+
+    expect(Math.abs(knownMs - unknownMs)).toBeLessThan(100);
+
+    // The slow send is still in flight (or just finished) — drain it so it
+    // can't bleed into another test.
+    await flushPendingSends();
+    expect(sent).toHaveLength(1);
   });
 });
 
@@ -154,6 +190,7 @@ describe("POST /api/auth/reset-password/:id", () => {
     await request(app)
       .post("/api/auth/forgot-password")
       .send({ email: "ada@example.com", baseResetURL: `${ADMIN_ORIGIN}/reset-password` });
+    await flushPendingSends();
     return { app, raw: linkFrom(sent[0]!.text).split("/").pop()! };
   }
 
@@ -168,6 +205,41 @@ describe("POST /api/auth/reset-password/:id", () => {
       .post("/api/auth/login")
       .send({ email: "ada@example.com", password: "NewPassword123" });
     expect(login.status).toBe(200);
+  });
+
+  // I1 regression: a token issued before the reset must stop working —
+  // otherwise a stolen token survives the owner's own recovery. Backdate
+  // the "before" token's `iat` explicitly (10s in the past) rather than
+  // sleeping or faking the system clock, so the gap past the 1s skew
+  // allowance is deterministic.
+  it("invalidates tokens issued before the reset, but not ones issued after", async () => {
+    const { app, raw } = await startReset();
+    const user = await User.findOne({ email: "ada@example.com" });
+    const staleToken = signToken({
+      sub: user!._id.toString(),
+      role: "Learner",
+      iat: Math.floor(Date.now() / 1000) - 10,
+    });
+
+    const reset = await request(app)
+      .post(`/api/auth/reset-password/${raw}`)
+      .send({ password: "NewPassword123", confirmPassword: "NewPassword123" });
+    expect(reset.status).toBe(200);
+
+    const staleCheck = await request(app)
+      .get("/api/auth/check-auth")
+      .set("Authorization", `Bearer ${staleToken}`);
+    expect(staleCheck.status).toBe(401);
+
+    const login = await request(app)
+      .post("/api/auth/login")
+      .send({ email: "ada@example.com", password: "NewPassword123" });
+    expect(login.status).toBe(200);
+
+    const freshCheck = await request(app)
+      .get("/api/auth/check-auth")
+      .set("Authorization", `Bearer ${login.body.token}`);
+    expect(freshCheck.status).toBe(200);
   });
 
   // Review Focus 2

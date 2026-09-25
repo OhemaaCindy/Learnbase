@@ -3,6 +3,7 @@ import request from "supertest";
 import { createApp } from "../../app.js";
 import { User } from "./user.model.js";
 import { fakeMailer, fakeImageStore } from "../../test/factories.js";
+import { signToken } from "../../shared/auth/jwt.js";
 
 function appWith() {
   const mail = fakeMailer();
@@ -54,6 +55,45 @@ describe("POST /api/auth/change-password", () => {
       .post("/api/auth/login")
       .send({ email: "ada@example.com", password: "BrandNew123" });
     expect(newLogin.status).toBe(200);
+  });
+
+  // I1 regression: a token issued before change-password must stop
+  // working — otherwise a stolen token survives the owner's own recovery.
+  // The "before" token's `iat` is backdated by 10s explicitly rather than
+  // sleeping or faking the system clock, keeping it deterministically past
+  // the 1s skew allowance.
+  it("invalidates tokens issued before a change-password, but not ones issued after", async () => {
+    const { app } = appWith();
+    const user = await User.create({
+      firstName: "Ada", lastName: "Lovelace", email: "ada@example.com",
+      password: "Password123", role: "Learner",
+    });
+    const staleToken = signToken({
+      sub: user._id.toString(),
+      role: "Learner",
+      iat: Math.floor(Date.now() / 1000) - 10,
+    });
+
+    const change = await request(app)
+      .post("/api/auth/change-password")
+      .set("Authorization", `Bearer ${staleToken}`)
+      .send({ password: "BrandNew123", confirmPassword: "BrandNew123" });
+    expect(change.status).toBe(200);
+
+    const staleCheck = await request(app)
+      .get("/api/auth/check-auth")
+      .set("Authorization", `Bearer ${staleToken}`);
+    expect(staleCheck.status).toBe(401);
+
+    const login = await request(app)
+      .post("/api/auth/login")
+      .send({ email: "ada@example.com", password: "BrandNew123" });
+    expect(login.status).toBe(200);
+
+    const freshCheck = await request(app)
+      .get("/api/auth/check-auth")
+      .set("Authorization", `Bearer ${login.body.token}`);
+    expect(freshCheck.status).toBe(200);
   });
 
   it("rejects mismatched confirmation", async () => {

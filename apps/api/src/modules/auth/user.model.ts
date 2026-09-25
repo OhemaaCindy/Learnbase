@@ -19,6 +19,7 @@ export interface UserDocument extends Document {
   resetPasswordExpiresAt?: Date;
   verificationAttempts: number;
   lastLogin?: Date;
+  passwordChangedAt?: Date;
   profileImage?: string;
   description?: string;
   location?: string;
@@ -50,6 +51,12 @@ const userSchema = new Schema<UserDocument>(
     resetPasswordExpiresAt: { type: Date, select: false },
     verificationAttempts: { type: Number, default: 0, select: false },
     lastLogin: { type: Date },
+    // Set on every password change (reset or change-password), never read
+    // back by application code — only compared against a token's `iat` in
+    // `authenticate` so a token issued before the change stops working.
+    // `select: false` so it never appears on an ordinary query, on top of
+    // being excluded from `toPublicUser` below.
+    passwordChangedAt: { type: Date, select: false },
     profileImage: { type: String },
     description: { type: String },
     location: { type: String },
@@ -74,22 +81,37 @@ export const User: Model<UserDocument> =
   (mongoose.models.User as Model<UserDocument>) ??
   model<UserDocument>("User", userSchema);
 
-const HIDDEN = [
-  "password",
-  "verificationToken",
-  "verificationTokenExpiresAt",
-  "resetPasswordToken",
-  "resetPasswordExpiresAt",
-  "verificationAttempts",
-] as const;
-
 /**
- * The only way a user reaches a response body. Deletes every credential and
- * token field rather than listing what to keep, so a field added to the schema
- * is never leaked by omission.
+ * The only way a user reaches a response body. This is an ALLOWLIST: every
+ * field on `PublicUser` is copied here explicitly off the typed
+ * `UserDocument`, so a field added to the schema later — a future
+ * credential, token, or `passwordChangedAt` above — is excluded by default
+ * until someone deliberately adds it here, instead of leaking by omission
+ * the way a denylist (delete the known-sensitive fields, return the rest)
+ * would.
+ *
+ * Because the return value is an object literal assigned to `PublicUser`
+ * (never cast to it), tsc checks this against the contract on every build:
+ * a field the contract requires but that isn't listed below is a compile
+ * error, not a runtime surprise — which is how this used to ship a
+ * `lastLogin` the type claimed was always present but signup never sets.
  */
 export function toPublicUser(doc: UserDocument): PublicUser {
-  const plain = doc.toObject({ virtuals: false }) as Record<string, unknown>;
-  for (const key of HIDDEN) delete plain[key];
-  return plain as unknown as PublicUser;
+  return {
+    _id: doc._id.toString(),
+    firstName: doc.firstName,
+    lastName: doc.lastName,
+    email: doc.email,
+    role: doc.role,
+    isVerified: doc.isVerified,
+    lastLogin: doc.lastLogin,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+    __v: doc.__v,
+    contact: doc.contact,
+    profileImage: doc.profileImage,
+    description: doc.description,
+    location: doc.location,
+    disabled: doc.disabled,
+  };
 }

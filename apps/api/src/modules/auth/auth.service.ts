@@ -6,6 +6,7 @@ import { signToken } from "../../shared/auth/jwt.js";
 import type { Mailer } from "../../shared/adapters/index.js";
 import { verificationEmail, resetPasswordEmail } from "../../shared/adapters/mailer.js";
 import { assertAllowedResetUrl } from "../../shared/auth/clientOrigins.js";
+import { redactSecrets } from "../../shared/middleware/errorHandler.js";
 import { User, toPublicUser, BCRYPT_ROUNDS } from "./user.model.js";
 import type { UserDocument } from "./user.model.js";
 import type { LoginInput, UpdateProfileInput } from "./auth.schema.js";
@@ -156,6 +157,25 @@ function hashToken(raw: string): string {
   return crypto.createHash("sha256").update(raw).digest("hex");
 }
 
+/**
+ * Sends in flight for `requestPasswordReset`, tracked so tests can await
+ * "the email actually went out" deterministically instead of racing a
+ * fire-and-forget promise or sleeping. A `Set` (not a single promise)
+ * because concurrent requests can each have a send in flight at once; each
+ * entry removes itself once settled.
+ */
+const pendingSends = new Set<Promise<void>>();
+
+function trackSend(promise: Promise<void>): void {
+  pendingSends.add(promise);
+  void promise.finally(() => pendingSends.delete(promise));
+}
+
+/** Resolves once every currently in-flight send has settled. Tests only. */
+export function flushPendingSends(): Promise<void> {
+  return Promise.all(pendingSends).then(() => undefined);
+}
+
 export async function requestPasswordReset(
   rawEmail: string,
   baseResetURL: string,
@@ -178,7 +198,22 @@ export async function requestPasswordReset(
   );
 
   const link = `${base.replace(/\/+$/, "")}/${raw}`;
-  await mailer.send({ to: user.email, ...resetPasswordEmail(link) });
+
+  // Deliberately NOT awaited: the caller must get the same response,
+  // in the same time, whether or not an account exists. Awaiting the send
+  // here made this a timing oracle — a slow mailer round trip on the "user
+  // exists" branch, nothing at all on the "no such user" branch, with an
+  // otherwise byte-identical response. Respond as soon as the token is
+  // persisted; the send happens after, and its outcome never reaches the
+  // caller — including whether it happened at all.
+  trackSend(
+    mailer.send({ to: user.email, ...resetPasswordEmail(link) }).catch((err) => {
+      console.error(
+        "forgot-password: mail send failed:",
+        redactSecrets(err instanceof Error ? err.message : String(err)),
+      );
+    }),
+  );
 }
 
 export async function resetPassword(
@@ -197,6 +232,8 @@ export async function resetPassword(
   user.password = newPassword; // pre-save hook hashes it
   user.resetPasswordToken = undefined;
   user.resetPasswordExpiresAt = undefined;
+  // Evicts every token issued before this moment — see `authenticate`.
+  user.passwordChangedAt = new Date();
   await user.save();
 }
 
@@ -207,6 +244,8 @@ export async function changePassword(
   const user = await User.findById(userId).select("+password");
   if (!user) throw new AppError("Not authorised", 401);
   user.password = newPassword;
+  // Evicts every token issued before this moment — see `authenticate`.
+  user.passwordChangedAt = new Date();
   await user.save();
 }
 

@@ -176,6 +176,7 @@ describe("GET /api/auth/check-auth", () => {
     expect(res.body.user.verificationToken).toBeUndefined();
     expect(res.body.user.resetPasswordToken).toBeUndefined();
     expect(res.body.user.resetPasswordExpiresAt).toBeUndefined();
+    expect(res.body.user.passwordChangedAt).toBeUndefined();
   });
 
   it("rejects an anonymous request with 401", async () => {

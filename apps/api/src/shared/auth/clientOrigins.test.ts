@@ -43,6 +43,19 @@ describe("assertAllowedResetUrl", () => {
     ).toThrow(AppError);
   });
 
+  it("strips userinfo from an allowed host instead of returning it verbatim", () => {
+    // Origin here really is the allowed learner.example.com — `.origin`
+    // ignores userinfo — so this passes the allowlist check. Returning it
+    // unchanged would email a link that reads as leading with "evil.test@",
+    // a phishing tell, even though no parser is actually fooled about the host.
+    const candidate = "https://evil.test@learner.example.com/reset-password";
+    const result = assertAllowedResetUrl(candidate);
+    expect(result).not.toContain("evil.test@");
+    expect(result).not.toContain("@");
+    expect(new URL(result).username).toBe("");
+    expect(new URL(result).host).toBe("learner.example.com");
+  });
+
   it("rejects a non-http(s) scheme", () => {
     expect(() =>
       assertAllowedResetUrl("ftp://learner.example.com/reset-password"),

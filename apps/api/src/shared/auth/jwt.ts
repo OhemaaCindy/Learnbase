@@ -5,6 +5,15 @@ import { AppError } from "../errors/AppError.js";
 export interface TokenPayload {
   sub: string;
   role: Role;
+  /**
+   * Seconds since epoch. Normally left for `jsonwebtoken` to stamp at sign
+   * time; `authenticate` reads it back to reject a token issued before the
+   * account's last password change. Exposed here (rather than passing
+   * `iat` only through the signed-and-decoded payload) so a caller can
+   * also set it explicitly — tests use this to construct a deliberately
+   * backdated token without sleeping or faking the system clock.
+   */
+  iat?: number;
 }
 
 function secret(): string {

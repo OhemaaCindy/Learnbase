@@ -8,6 +8,7 @@ import { type AppDeps, createRealDeps } from "./shared/adapters/index.js";
 import { createAuthRouter } from "./modules/auth/auth.routes.js";
 import { logout } from "./modules/auth/auth.controller.js";
 import { authenticate } from "./shared/middleware/authenticate.js";
+import { allowedOrigins } from "./shared/auth/clientOrigins.js";
 
 /**
  * Builds the Express application without binding a port, so tests can
@@ -26,15 +27,13 @@ export function createApp(deps: AppDeps = createRealDeps()): Express {
   // the host's actual proxy depth (0 direct, 1 behind a single proxy).
   app.set("trust proxy", Number(process.env.TRUST_PROXY ?? 0));
 
-  const allowedOrigins = [
-    process.env.CLIENT_ADMIN_URL ?? "http://localhost:5173",
-    process.env.CLIENT_LEARNER_URL ?? "http://localhost:5174",
-  ];
-
   app.use(helmet());
   app.use(
     cors({
-      origin: allowedOrigins,
+      // Single source of truth shared with the reset-URL allowlist in
+      // shared/auth/clientOrigins.ts — a staging origin added to one used
+      // to silently miss the other.
+      origin: allowedOrigins(),
       credentials: true,
     }),
   );

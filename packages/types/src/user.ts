@@ -4,10 +4,11 @@ export type Role = "Admin" | "Learner";
  * The canonical user shape returned by the API.
  *
  * Deliberately omits `password`, `verificationToken`,
- * `verificationTokenExpiresAt`, `resetPasswordToken` and
- * `resetPasswordExpiresAt`. The previous API returned those from
- * /auth/check-auth, which handed any valid session the means to reset
- * that account's password. Neither frontend reads them. See spec §7.
+ * `verificationTokenExpiresAt`, `resetPasswordToken`,
+ * `resetPasswordExpiresAt` and `passwordChangedAt`. The previous API
+ * returned some of those from /auth/check-auth, which handed any valid
+ * session the means to reset that account's password. Neither frontend
+ * reads them. See spec §7.
  */
 export interface User {
   _id: string;
@@ -16,7 +17,8 @@ export interface User {
   email: string;
   role: Role;
   isVerified: boolean;
-  lastLogin: Date;
+  /** Absent until the account's first login — never set on signup. */
+  lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
   __v: number;
