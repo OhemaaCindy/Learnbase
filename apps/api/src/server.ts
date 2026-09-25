@@ -4,15 +4,27 @@ import { connectDB } from "./shared/db.js";
 import { createRealDeps } from "./shared/adapters/index.js";
 
 const port = Number(process.env.PORT ?? 5050);
-const mongoUri = process.env.MONGODB_URI;
 
-if (!mongoUri) {
-  console.error("MONGODB_URI is not set. Copy .env.example to .env.");
+const REQUIRED = [
+  "MONGODB_URI",
+  "JWT_SECRET",
+  ...(process.env.NODE_ENV === "production"
+    ? (["CLIENT_ADMIN_URL", "CLIENT_LEARNER_URL"] as const)
+    : []),
+] as const;
+
+const missing = REQUIRED.filter((key) => !process.env[key]);
+if (missing.length > 0) {
+  console.error(
+    `Missing required environment variables: ${missing.join(", ")}. Copy .env.example to .env.`,
+  );
   process.exit(1);
 }
 
+const mongoUri = process.env.MONGODB_URI!;
+
 async function start(): Promise<void> {
-  await connectDB(mongoUri!);
+  await connectDB(mongoUri);
   console.log("Connected to MongoDB");
 
   createApp(createRealDeps()).listen(port, () => {

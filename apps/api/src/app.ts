@@ -21,6 +21,11 @@ export function createApp(deps: AppDeps = createRealDeps()): Express {
   const app = express();
   app.set("deps", deps);
 
+  // Configurable, not `true`: blanket trust would let any client spoof
+  // X-Forwarded-For and bypass the rate limiters below entirely. Must match
+  // the host's actual proxy depth (0 direct, 1 behind a single proxy).
+  app.set("trust proxy", Number(process.env.TRUST_PROXY ?? 0));
+
   const allowedOrigins = [
     process.env.CLIENT_ADMIN_URL ?? "http://localhost:5173",
     process.env.CLIENT_LEARNER_URL ?? "http://localhost:5174",
