@@ -31,21 +31,24 @@ axiosClient.interceptors.response.use(
   function (error) {
     if (error.response) {
       if (error.response.status === 401) {
-        const profileConpletionError = error.response.data[0]
+        // The API returns { success: false, errors: [{ message }] }. The older
+        // backend returned a bare array of strings. Read whichever arrived
+        // rather than assuming, so an unexpected shape cannot throw in here and
+        // swallow the real error.
+        const data = error.response.data;
+        const message = Array.isArray(data)
+          ? data[0]
+          : data?.errors?.[0]?.message;
+
+        const profileCompletionError = String(message ?? "")
           .toLowerCase()
           .includes("complete your profile");
 
-        // Remove token for all 401 error except incomplet profile error
-        if (!profileConpletionError) {
+        // Keep the session for the incomplete-profile case; drop it otherwise.
+        if (!profileCompletionError) {
           Cookies.remove("token");
           window.location.href = "/";
         }
-        // Cookies.remove("token");
-        // window.location.href = "/";
-        console.log({
-          msg: "========================\ntoken removed and navigated to the home page",
-        });
-        console.log("🚀 ~ error.response.data:", error.response.data[0]);
       } else if (error.response.status === 500) {
         return Promise.reject(
           new Error("Server error. Please try again later.")
